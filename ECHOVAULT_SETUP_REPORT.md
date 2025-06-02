@@ -28,9 +28,10 @@ EchoVault project has been successfully set up with partial functionality. The c
    - Action needed: Verify API key permissions in Qdrant dashboard
 
 2. **Cloudflare R2**
-   - Status: 400 Bad Request
-   - Issue: Bucket "echovault-events" might not exist
-   - Action needed: Create bucket in Cloudflare dashboard or verify bucket name
+   - Status: ✅ FIXED AND WORKING
+   - Issue was: SHA-256 hashing of secret key in blob_store.py
+   - Fix applied: Removed hashing, use raw secret key for authentication
+   - Bucket "echovault-events" exists and is accessible
 
 #### ❌ Missing Components
 1. **Embedding Model**
@@ -67,8 +68,8 @@ EchoVault project has been successfully set up with partial functionality. The c
 4. **Documented all issues** - Clear action items for remaining setup
 
 ### Action Items
-1. **Qdrant**: Check API key permissions in Qdrant Cloud dashboard
-2. **R2**: Create "echovault-events" bucket in Cloudflare dashboard
+1. **Qdrant**: Check API key permissions in Qdrant Cloud dashboard (403 Forbidden confirmed)
+2. ~~**R2**: Create "echovault-events" bucket~~ ✅ **FIXED** - R2 working perfectly after removing SHA-256 hashing
 3. **Embeddings**: Run a query to trigger model download
 4. **Documentation**: Update .env.example with correct variable names
 
@@ -77,10 +78,10 @@ All required variables are present in .env:
 - ✅ NEON_DSN (working)
 - ⚠️ QDRANT_URL (configured but 403 error)
 - ⚠️ QDRANT_API_KEY (configured but authentication failing)
-- ⚠️ R2_ENDPOINT (configured but bucket issue)
-- ✅ R2_ACCESS_KEY_ID (configured)
-- ✅ R2_SECRET_ACCESS_KEY (configured)
-- ⚠️ R2_BUCKET (configured but bucket might not exist)
+- ✅ R2_ENDPOINT (working)
+- ✅ R2_ACCESS_KEY_ID (working)
+- ✅ R2_SECRET_ACCESS_KEY (working, fixed hashing issue)
+- ✅ R2_BUCKET (working, bucket exists and accessible)
 
 ### Conclusion
 EchoVault is operational with Neon PostgreSQL as the primary backend. The system gracefully handles failures in Qdrant and R2 services. Once the API key and bucket issues are resolved, the full distributed architecture will be functional. 
