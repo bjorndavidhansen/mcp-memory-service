@@ -75,12 +75,21 @@ class BlobStoreClient:
                 self.client = None
                 return
 
-            logger.info("Attempting to create boto3 S3 client for R2...")
+            if not isinstance(self.r2_secret_key, str):
+                logger.error("R2_SECRET_ACCESS_KEY is not a string, cannot hash.")
+                self.client = None # Ensure client is None
+                return
+
+            logger.debug("Hashing R2 secret key with SHA-256.")
+            hashed_secret_key = hashlib.sha256(self.r2_secret_key.encode('utf-8')).hexdigest()
+
+            logger.info("Attempting to create boto3 S3 client for R2 with hashed secret key and region_name='auto'.")
             self.client = boto3.client(
                 service_name='s3',
                 endpoint_url=self.r2_endpoint,
                 aws_access_key_id=self.r2_access_key,
-                aws_secret_access_key=self.r2_secret_key,
+                aws_secret_access_key=hashed_secret_key, # Use hashed key
+                region_name='auto', # Add region_name
                 config=Config(signature_version='s3v4')
             )
             logger.info("boto3 S3 client created. Verifying bucket existence...")
