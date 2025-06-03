@@ -1,0 +1,8 @@
+# MCP Server Requirements for EchoVault
+# Install with: pip install -r requirements-mcp.txt
+
+# Official MCP Python SDK
+mcp>=1.0.0
+
+# Include EchoVault dependencies
+-r requirements-echovault.txt 

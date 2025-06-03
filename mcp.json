@@ -1,0 +1,155 @@
+{
+  "name": "echovault-memory",
+  "version": "1.0.0",
+  "description": "Enterprise-grade semantic memory with free-tier cloud services",
+  "runtime": "docker",
+  "entry_point": "python -m src.mcp_memory_service",
+  "tools": [
+    {
+      "name": "store_memory",
+      "description": "Store a memory with semantic embeddings and optional tags",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The content to store in memory"
+          },
+          "tags": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Optional tags for categorizing the memory"
+          },
+          "importance": {
+            "type": "number",
+            "description": "Importance score (0.0-1.0)",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "default": 0.5
+          }
+        },
+        "required": ["content"]
+      }
+    },
+    {
+      "name": "search_memories",
+      "description": "Search memories using semantic similarity",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query for semantic similarity"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum number of results to return",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 100
+          },
+          "similarity_threshold": {
+            "type": "number",
+            "description": "Minimum similarity score (0.0-1.0)",
+            "default": 0.3,
+            "minimum": 0.0,
+            "maximum": 1.0
+          }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "search_by_tag",
+      "description": "Find memories by tag",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "description": "Tag to search for"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum number of results",
+            "default": 10,
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": ["tag"]
+      }
+    },
+    {
+      "name": "get_memory_stats",
+      "description": "Get storage statistics and health information",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "delete_memory",
+      "description": "Delete a specific memory by ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "memory_id": {
+            "type": "string",
+            "description": "ID of the memory to delete"
+          }
+        },
+        "required": ["memory_id"]
+      }
+    }
+  ],
+  "capabilities": {
+    "tools": true,
+    "logging": true,
+    "sampling": false
+  },
+  "environment": {
+    "USE_ECHOVAULT": "true",
+    "NEON_DSN": "${NEON_DSN}",
+    "QDRANT_URL": "${QDRANT_URL}",
+    "QDRANT_API_KEY": "${QDRANT_API_KEY}",
+    "R2_ENDPOINT": "${R2_ENDPOINT}",
+    "R2_ACCESS_KEY_ID": "${R2_ACCESS_KEY_ID}",
+    "R2_SECRET_ACCESS_KEY": "${R2_SECRET_ACCESS_KEY}",
+    "R2_BUCKET": "${R2_BUCKET}"
+  },
+  "requirements": {
+    "python": ">=3.11",
+    "packages": [
+      "mcp",
+      "asyncpg>=0.29.0",
+      "qdrant-client>=1.7.0",
+      "boto3>=1.34.13",
+      "sentence-transformers>=2.2.2",
+      "opentelemetry-api>=1.22.0",
+      "prometheus-client>=0.19.0"
+    ]
+  },
+  "documentation": {
+    "usage": "Docker MCP server providing enterprise-grade semantic memory capabilities",
+    "examples": [
+      {
+        "tool": "store_memory",
+        "input": {
+          "content": "Project deadline is May 15th for the new website launch",
+          "tags": ["project", "deadline", "website"],
+          "importance": 0.8
+        }
+      },
+      {
+        "tool": "search_memories",
+        "input": {
+          "query": "website deadline",
+          "limit": 5,
+          "similarity_threshold": 0.4
+        }
+      }
+    ]
+  }
+} 

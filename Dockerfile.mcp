@@ -1,0 +1,50 @@
+# EchoVault MCP Server Dockerfile
+# Provides a containerized MCP server for EchoVault semantic memory
+
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV USE_ECHOVAULT=true
+
+# Create app directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements files
+COPY requirements.txt requirements-echovault.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-echovault.txt && \
+    pip install --no-cache-dir mcp
+
+# Copy source code
+COPY src/ src/
+COPY mcp.json ./
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs
+
+# Set permissions
+RUN chmod +x src/mcp_memory_service/mcp_server.py
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import src.mcp_memory_service.mcp_server; print('OK')" || exit 1
+
+# Default command - run MCP server
+CMD ["python", "-m", "src.mcp_memory_service"]
+
+# Metadata
+LABEL maintainer="EchoVault Team"
+LABEL description="Enterprise-grade semantic memory MCP server"
+LABEL version="1.0.0"
+LABEL org.opencontainers.image.source="https://github.com/bjorndavidhansen/mcp-memory-service" 
