@@ -205,11 +205,11 @@ def trace_function(name: Optional[str] = None):
                     if PROMETHEUS_AVAILABLE and _metrics_initialized:
                         if func.__name__ == "store" and "memory_store_duration" in _histograms:
                             _histograms["memory_store_duration"].observe(duration)
-                            _counters["memory_store_total"].inc()
-                            _counters["memory_store_success"].inc()
+                            _counters["memory_store_total"].inc(1)
+                            _counters["memory_store_success"].inc(1)
                         elif func.__name__ == "retrieve" and "memory_retrieve_duration" in _histograms:
                             _histograms["memory_retrieve_duration"].observe(duration)
-                            _counters["memory_retrieve_total"].inc()
+                            _counters["memory_retrieve_total"].inc(1)
                     
                     return result
                 except Exception as e:

@@ -10,6 +10,7 @@ with a fallback to pgvector or ChromaDB.
 import os
 import json
 import logging
+import time
 from typing import List, Dict, Any, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
@@ -81,14 +82,18 @@ class VectorStoreClient:
                         
                         if self.collection_name not in collection_names:
                             logger.info(f"Collection '{self.collection_name}' not found in Qdrant. Attempting to create it.")
-                            self.qdrant_client.create_collection(
-                                collection_name=self.collection_name,
-                                vectors_config=models.VectorParams(
-                                    size=1536,  # OpenAI ada-002 embedding size
-                                    distance=models.Distance.COSINE
+                            try:
+                                self.qdrant_client.create_collection(
+                                    collection_name=self.collection_name,
+                                    vectors_config=models.VectorParams(
+                                        size=384,  # all-MiniLM-L6-v2 embedding size
+                                        distance=models.Distance.COSINE
+                                    )
                                 )
-                            )
-                            logger.info(f"Successfully created collection '{self.collection_name}' in Qdrant.")
+                                logger.info(f"Successfully created collection '{self.collection_name}' in Qdrant.")
+                            except Exception as create_error:
+                                logger.error(f"Failed to create Qdrant collection: {create_error}")
+                                raise
                         else:
                             logger.info(f"Collection '{self.collection_name}' already exists in Qdrant.")
                         
@@ -99,9 +104,14 @@ class VectorStoreClient:
                     self.use_qdrant = False
                 except Exception as e:
                     # Log the full exception details
-                    logger.error(f"Failed to initialize Qdrant client or verify collection: {type(e).__name__} - {e}", exc_info=True)
-                    logger.error("This could be due to incorrect QDRANT_URL, invalid QDRANT_API_KEY, network issues, or insufficient permissions for the API key.")
-                    logger.error("Please verify your Qdrant URL, API key (ensure it has permissions to list/create collections), and network connectivity from the service environment.")
+                    logger.error(f"Failed to initialize Qdrant client or verify collection: {type(e).__name__} - {e}")
+                    if "403" in str(e) or "Forbidden" in str(e):
+                        logger.error("Qdrant API key lacks permissions for collection operations. Check API key permissions in Qdrant dashboard.")
+                    elif "404" in str(e) or "not found" in str(e).lower():
+                        logger.error("Qdrant endpoint not found. Verify QDRANT_URL is correct.")
+                    else:
+                        logger.error("This could be due to incorrect QDRANT_URL, invalid QDRANT_API_KEY, or network issues.")
+                    logger.info("Falling back to Neon pgvector for vector operations.")
                     self.use_qdrant = False # Disable Qdrant use on initialization failure
             
             self._is_initialized = True # Ensure this is set even if Qdrant fails but Neon is okay
@@ -154,12 +164,16 @@ class VectorStoreClient:
                 logger.debug(f"Attempting to upsert point with ID '{id}' into Qdrant collection '{self.collection_name}'.")
                 # logger.debug(f"Qdrant upsert payload (excluding vector): {payload}") # Potentially verbose
                 
+                # Convert string ID to integer for Qdrant
+                # Use hash of the ID to create a unique integer
+                qdrant_id = abs(hash(id)) % (2**63)  # Ensure it fits in signed int64
+                
                 # Insert into Qdrant
                 self.qdrant_client.upsert(
                     collection_name=self.collection_name,
                     points=[
                         models.PointStruct(
-                            id=id,
+                            id=qdrant_id,
                             vector=embedding,
                             payload=payload
                         )
@@ -177,6 +191,18 @@ class VectorStoreClient:
                 tags = metadata.get("tags", [])
                 memory_type = metadata.get("memory_type", "")
                 timestamp = metadata.get("timestamp")
+                
+                # Convert ISO timestamp to Unix timestamp if needed
+                if timestamp and isinstance(timestamp, str):
+                    try:
+                        from datetime import datetime
+                        timestamp = int(datetime.fromisoformat(timestamp.replace('Z', '+00:00')).timestamp())
+                    except ValueError:
+                        logger.warning(f"Failed to parse timestamp '{timestamp}', using current time")
+                        timestamp = int(time.time())
+                elif timestamp is None:
+                    timestamp = int(time.time())
+                
                 payload_url = metadata.get("payload_url")
                 content_hash = metadata.get("content_hash", id)
                 

@@ -75,11 +75,23 @@ class EchoVaultStorage(MemoryStorage):
             await self.vector_store.initialize()
             await self.blob_store.initialize()
             
-            # Get embedding model from vector store if available
+            # Initialize embedding model
             if hasattr(self.vector_store, "model") and self.vector_store.model:
                 self.model = self.vector_store.model
             elif hasattr(self.neon_client, "model") and self.neon_client.model:
                 self.model = self.neon_client.model
+            else:
+                # Initialize SentenceTransformer as fallback
+                try:
+                    from sentence_transformers import SentenceTransformer
+                    self.model = SentenceTransformer('all-MiniLM-L6-v2')
+                    logger.info("Initialized SentenceTransformer model: all-MiniLM-L6-v2")
+                except ImportError:
+                    logger.error("sentence-transformers not available, embeddings will be disabled")
+                    self.model = None
+                except Exception as e:
+                    logger.error(f"Failed to initialize embedding model: {e}")
+                    self.model = None
             
             self._is_initialized = True
             logger.info("EchoVault storage initialized successfully")

@@ -74,9 +74,13 @@ def initialize(service_name: str = "echovault-memory-service") -> bool:
     if OTEL_AVAILABLE:
         try:
             # Get OTLP endpoint from environment
-            otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+            otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
             
-            if otlp_endpoint:
+            # Skip telemetry if endpoint is empty, "none", or placeholder
+            disabled_values = ("", "none", "null", "disabled")
+            if (otlp_endpoint and 
+                otlp_endpoint.lower() not in disabled_values and 
+                not otlp_endpoint.startswith("<")):
                 # Create resource with service name
                 resource = Resource.create({"service.name": service_name})
                 
@@ -211,15 +215,15 @@ def trace_write(content_length: int, has_payload_url: bool, tags_count: int) -> 
     
     if PROMETHEUS_AVAILABLE and _metrics:
         try:
-            _metrics["memory_store_count"].inc()
+            _metrics["memory_store_count"].inc(1)
             _metrics["content_size"].observe(content_length)
             
             # Update memory count
-            _metrics["memory_count"]._value.inc()
+            _metrics["memory_count"].inc(1)
             
             # Update blob count if applicable
             if has_payload_url:
-                _metrics["blob_count"]._value.inc()
+                _metrics["blob_count"].inc(1)
         except Exception as e:
             logger.error(f"Failed to record write metrics: {str(e)}")
 
@@ -236,7 +240,7 @@ def trace_read(latency_ms: float, results_count: int) -> None:
     
     if PROMETHEUS_AVAILABLE and _metrics:
         try:
-            _metrics["memory_retrieve_count"].inc()
+            _metrics["memory_retrieve_count"].inc(1)
             _metrics["memory_retrieve_duration"].observe(latency_ms / 1000.0)  # Convert to seconds
         except Exception as e:
             logger.error(f"Failed to record read metrics: {str(e)}")

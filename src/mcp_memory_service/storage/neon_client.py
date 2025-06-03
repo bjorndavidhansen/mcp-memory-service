@@ -80,12 +80,35 @@ class NeonClient:
     async def _init_schema(self):
         """Initialize database schema."""
         async with self.pool.acquire() as conn:
+            # Check if memories table exists and has correct vector dimensions
+            try:
+                # Check current vector dimension
+                result = await conn.fetchrow("""
+                    SELECT atttypmod 
+                    FROM pg_attribute 
+                    WHERE attrelid = 'memories'::regclass 
+                    AND attname = 'embedding'
+                """)
+                
+                current_dim = None
+                if result and result['atttypmod'] != -1:
+                    current_dim = result['atttypmod']
+                
+                # If table exists with wrong dimensions, recreate it
+                if current_dim and current_dim != 384:
+                    logger.warning(f"Memories table has wrong vector dimensions ({current_dim}), recreating with 384D")
+                    await conn.execute("DROP TABLE IF EXISTS memories CASCADE")
+                    await conn.execute("DROP TABLE IF EXISTS telemetry CASCADE")
+                    
+            except Exception as e:
+                logger.debug(f"Table check failed (likely doesn't exist): {e}")
+            
             # Create memories table with vector support
             await conn.execute("""
                 CREATE TABLE IF NOT EXISTS memories (
                     id TEXT PRIMARY KEY,
                     content TEXT NOT NULL,
-                    embedding VECTOR(1536),
+                    embedding VECTOR(384),
                     metadata JSONB,
                     tags JSONB,
                     timestamp BIGINT,
@@ -174,12 +197,12 @@ class NeonClient:
                         id, content, embedding, tags, timestamp, 
                         content_hash, memory_type, metadata, payload_url
                     )
-                    VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    VALUES($1, $2, $3::vector, $4, $5, $6, $7, $8, $9)
                     ON CONFLICT(content_hash) DO NOTHING
                 """, 
                 content_hash,  # Using content_hash as ID
                 content,
-                embedding,
+                str(embedding) if isinstance(embedding, list) else embedding,
                 json.dumps(tags) if isinstance(tags, list) else tags,
                 timestamp,
                 content_hash,
@@ -231,16 +254,16 @@ class NeonClient:
                     SELECT 
                         id, content, content_hash, memory_type, tags, metadata,
                         timestamp, payload_url,
-                        1 - (embedding <=> $1) as similarity
+                        1 - (embedding <=> $1::vector) as similarity
                     FROM 
                         memories
                     WHERE 
                         embedding IS NOT NULL AND
-                        1 - (embedding <=> $1) >= $3
+                        1 - (embedding <=> $1::vector) >= $3
                     ORDER BY 
                         similarity DESC
                     LIMIT $2
-                """, embedding, limit, similarity_threshold)
+                """, str(embedding) if isinstance(embedding, list) else embedding, limit, similarity_threshold)
                 
                 # Record telemetry
                 await conn.execute("""
