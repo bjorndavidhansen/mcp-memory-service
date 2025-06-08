@@ -4,7 +4,7 @@
 FROM python:3.11-slim
 
 # Set environment variables
-ENV PYTHONPATH=/app
+ENV PYTHONPATH=/app:/app/src
 ENV PYTHONUNBUFFERED=1
 ENV USE_ECHOVAULT=true
 
@@ -24,7 +24,8 @@ COPY requirements.txt requirements-echovault.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     pip install --no-cache-dir -r requirements-echovault.txt && \
-    pip install --no-cache-dir mcp
+    pip install --no-cache-dir mcp && \
+    pip install --no-cache-dir torch sentence-transformers==3.3.1
 
 # Copy source code
 COPY src/ src/

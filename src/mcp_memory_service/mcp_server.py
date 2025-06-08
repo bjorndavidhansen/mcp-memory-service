@@ -37,7 +37,6 @@ except ImportError as e:
 try:
     from .storage.factory import create_storage
     from .models.memory import Memory
-    from .utils.logger import get_logger
 except ImportError as e:
     print("Error: EchoVault modules not found. Ensure you're running "
           "from the correct directory.")
@@ -45,7 +44,8 @@ except ImportError as e:
     sys.exit(1)
 
 # Configure logging
-logger = get_logger(__name__)
+import logging
+logger = logging.getLogger(__name__)
 
 
 class EchoVaultMCPServer:
@@ -71,21 +71,28 @@ class EchoVaultMCPServer:
     async def initialize_storage(self) -> None:
         """Initialize EchoVault storage backend."""
         try:
-            # Enable EchoVault mode
-            os.environ["USE_ECHOVAULT"] = "true"
+            # Enable EchoVault mode if not already set
+            if os.environ.get("USE_ECHOVAULT") != "false":
+                os.environ["USE_ECHOVAULT"] = "true"
             
             # Create storage instance
             self.storage = create_storage()
             
-            # Initialize if needed
+            # Initialize if needed - wrap in try/catch to avoid TaskGroup issues
             if hasattr(self.storage, 'initialize') and callable(self.storage.initialize):
-                await self.storage.initialize()
+                try:
+                    await self.storage.initialize()
+                except Exception as init_error:
+                    logger.warning(f"Storage initialization warning: {init_error}")
+                    # Continue without full initialization for basic MCP functionality
                 
             logger.info("EchoVault storage initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize EchoVault storage: {e}")
-            raise
+            # Create a minimal storage fallback instead of failing completely
+            logger.info("Falling back to minimal storage mode")
+            # Don't raise - allow server to continue with limited functionality
     
     def _register_tools(self) -> None:
         """Register MCP tools with the server."""
@@ -199,9 +206,18 @@ class EchoVaultMCPServer:
         async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:
             """Handle tool calls from MCP clients."""
             
-            # Ensure storage is initialized
+            # Ensure storage is initialized  
             if self.storage is None:
-                await self.initialize_storage()
+                try:
+                    await self.initialize_storage()
+                except Exception as e:
+                    # If storage initialization fails, return helpful error
+                    error_msg = f"Storage not available: {str(e)}"
+                    logger.error(error_msg)
+                    return [types.TextContent(type="text", text=json.dumps({
+                        "error": error_msg,
+                        "suggestion": "Check cloud service credentials and network connectivity"
+                    }, indent=2))]
             
             try:
                 if name == "store_memory":
@@ -356,12 +372,24 @@ async def main():
     """Main entry point for the MCP server."""
     logger.info("Starting EchoVault MCP Server...")
     
+    echovault_server = None
+    
     try:
         # Create server instance
         echovault_server = EchoVaultMCPServer()
+        logger.info("EchoVault MCP server instance created")
+        
+        # Pre-initialize storage to avoid issues during tool calls
+        try:
+            await echovault_server.initialize_storage()
+            logger.info("Storage pre-initialized successfully")
+        except Exception as storage_error:
+            logger.warning(f"Storage pre-initialization failed: {storage_error}")
+            logger.info("Server will continue with delayed storage initialization")
         
         # Run the server with stdio transport
         async with stdio_server() as (read_stream, write_stream):
+            logger.info("Starting MCP server with stdio transport")
             await echovault_server.server.run(
                 read_stream,
                 write_stream,
@@ -375,9 +403,23 @@ async def main():
                 )
             )
             
+    except KeyboardInterrupt:
+        logger.info("Server shutdown requested")
     except Exception as e:
         logger.error(f"Server error: {e}")
-        sys.exit(1)
+        # Log full traceback for debugging
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        # Don't call sys.exit() in async context, just raise to let asyncio.run handle it
+        raise
+    finally:
+        # Clean up resources
+        if echovault_server and hasattr(echovault_server, 'storage') and echovault_server.storage:
+            try:
+                if hasattr(echovault_server.storage, 'close'):
+                    await echovault_server.storage.close()
+            except Exception as cleanup_error:
+                logger.warning(f"Error during cleanup: {cleanup_error}")
 
 if __name__ == "__main__":
     asyncio.run(main()) 

@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "echovault": {
+      "command": "python",
+      "args": ["-m", "src.mcp_memory_service"],
+      "cwd": "C:\\Users\\bjorn\\OneDrive\\Documents\\Projects\\EchoVault\\mvp\\echovault-mvp-project\\echo-vault-project",
+      "env": {
+        "USE_ECHOVAULT": "true",
+        "NEON_DSN": "postgresql://neondb_owner:npg_5faeYbgrL1sB@ep-old-grass-a8em1hbs-pooler.eastus2.azure.neon.tech/neondb?sslmode=require",
+        "QDRANT_URL": "https://8a28c5eb-1c21-4a35-8cb3-2cfae36c884e.us-east-1-0.aws.cloud.qdrant.io:6333",
+        "QDRANT_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.OBX96O-5S23q0UN64W6oA2DSAOnv-EBAf2JIO9UPj64",
+        "R2_ENDPOINT": "https://af0f5b6a9c14116d6e696a600cee7db4.r2.cloudflarestorage.com",
+        "R2_ACCESS_KEY_ID": "84004b10e1996b70e5d96dbe96538ddb",
+        "R2_SECRET_ACCESS_KEY": "39d11404db69a3bcfa1ce0f27307d67f4fb8e82b315c8a430a506f1eb198816e",
+        "R2_BUCKET": "echovault-events",
+        "JWT_SECRET": "dev-echovault-secret-2025-change-in-prod"
+      }
+    }
+  }
+} 
